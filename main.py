@@ -27,6 +27,12 @@ class Book:
         meta_info = self.get_meta_info()
         self.title = meta_info["title"]
         self.author = meta_info["creator"]
+
+        order_pattern = "第?([一二三四五六七八九十]|\d){1,3}卷?话?"
+        title_pattern = f"^(\S+?)\s?({order_pattern}|\s({order_pattern}).*)$"
+        m = re.match(title_pattern, self.title)
+        self.series_name = m.group(1) if m is not None else None
+
         self.bangumi_id = None
         self.bangumi_name = None
         self.bangumi_authors = (None,)
@@ -72,13 +78,7 @@ class Book:
         return res
 
     def get_bangumi_info(self):
-        order_pattern = "\d{1,2}|第?[一二三四五六七八九十]卷?"
-        title_pattern = f"^(\S+?)\s?({order_pattern}|\s({order_pattern})\s\S+)$"
-        m = re.match(title_pattern, self.title)
-        if m is not None:
-            keyword = m.group(1)
-        else:
-            keyword = self.title
+        keyword = self.series_name or self.title
         logging.debug(f'Searching keyword "{keyword}".')
         result = search_novel(keyword)
         self.bangumi_id = result["id"]
@@ -98,7 +98,12 @@ class Book:
 
     def construct_output_path(self, output_root: Path) -> Path:
         if not self.bangumi_id:
-            return output_root / self.author / f"{self.title}.epub"
+            if self.series_name is not None:
+                return (
+                    output_root / self.author / self.series_name / f"{self.title}.epub"
+                )
+            else:
+                return output_root / self.author / f"{self.title}.epub"
 
         if self.bangumi_authors:
             author_names = [f"{a[1]}[{a[0]}]" for a in self.bangumi_authors]
@@ -203,15 +208,17 @@ if __name__ == "__main__":
     info_handle = logging.StreamHandler()
     info_handle.setLevel(logging.INFO)
     warning_handle = logging.FileHandler(
-        Path(output_path) / "error.log", encoding="utf-8"
+        Path(output_path) / "warning.log", encoding="utf-8"
     )
     warning_handle.setLevel(logging.WARNING)
     error_handle = logging.FileHandler(
-        Path(output_path) / "warning.log", encoding="utf-8"
+        Path(output_path) / "error.log", encoding="utf-8"
     )
     error_handle.setLevel(logging.ERROR)
     logging.basicConfig(
-        handlers=[info_handle, warning_handle, error_handle], level=logging.INFO, format=LOG_FORMAT
+        handlers=[info_handle, warning_handle, error_handle],
+        level=logging.INFO,
+        format=LOG_FORMAT,
     )
 
     for source_path in source_paths:

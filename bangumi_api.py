@@ -9,9 +9,12 @@ headers = {
 }
 
 base_url = "https://api.bgm.tv"
+ERROR_LIST = set()
 
 
 def search_novel(keyword):
+    if keyword in ERROR_LIST:
+        raise RuntimeError(f'Cannot find a novel named "{keyword}".')
     search_url = f"{base_url}/v0/search/subjects"
     payload = {
         "keyword": keyword,
@@ -23,6 +26,7 @@ def search_novel(keyword):
     r = requests.post(search_url, data=json.dumps(payload), headers=post_headers)
     result = r.json()
     if "data" not in result or not result["data"]:
+        ERROR_LIST.add(keyword)
         raise RuntimeError(f'Cannot find a novel named "{keyword}".')
 
     name_id_map = {}
@@ -34,8 +38,9 @@ def search_novel(keyword):
         name = subject["name_cn"] if "name_cn" in subject else subject["name"]
         id = subject["id"]
         name_id_map[name] = id
-    match_names = get_close_matches(keyword, name_id_map.keys(), n=3, cutoff=0.5)
+    match_names = get_close_matches(keyword, name_id_map.keys(), n=3, cutoff=0.6)
     if not match_names:
+        ERROR_LIST.add(keyword)
         raise RuntimeError(f'Cannot find a novel by "{keyword}".')
     return {"id": name_id_map[match_names[0]], "name": match_names[0]}
 
