@@ -136,7 +136,7 @@ def get_compressed(path: Path, tmp_path: Path, action: Optional[callable] = None
             comp_file.extractall(str(extract_path), pwd=passwd)
             break
         except Exception as e:
-            logging.error(e)
+            logging.error(f"{e} At location {path}.")
 
     logging.debug(f"extract dir: {extract_path}")
     if extract_path.is_dir() and any(extract_path.iterdir()):
@@ -154,12 +154,12 @@ def get_books(path, tmp_path, action: Optional[callable] = None) -> list[Book]:
             try:
                 action(epub)
             except Exception as e:
-                logging.error(e)
+                logging.error(f"{e} At location {path}.")
     for comp_file in chain(path.rglob("*.zip"), path.rglob("*.rar")):
         try:
             result.extend(get_compressed(comp_file, tmp_path, action))
         except Exception as e:
-            logging.error(e)
+            logging.error(f"{e} At location {path}.")
 
     return result
 
