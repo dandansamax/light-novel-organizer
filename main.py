@@ -98,10 +98,10 @@ class Book:
 
     def construct_output_path(self, output_root: Path) -> Path:
         if not self.bangumi_id:
-            return output_root / self.author / "unknown" / f"{self.title}.epub"
+            return output_root / self.author / f"{self.title}.epub"
 
         if self.bangumi_authors:
-            author_names = [a[1] for a in self.bangumi_authors]
+            author_names = [f"{a[1]}[{a[0]}]" for a in self.bangumi_authors]
             author_names.sort()
             author_dir_name = "_".join(author_names)
         else:
