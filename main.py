@@ -168,8 +168,8 @@ def organize_novel(path: Path, output_path: Path):
         fpath = book.construct_output_path(output_path)
         fpath.parent.mkdir(exist_ok=True, parents=True)
         shutil.copy(path, fpath)
-        logging.error(f"{e} At location {fpath}.")
-        raise
+        logging.warning(f"{e} At location {fpath}.")
+        return
 
     fpath = book.construct_output_path(output_path)
     fpath.parent.mkdir(exist_ok=True, parents=True)
@@ -202,12 +202,16 @@ if __name__ == "__main__":
     LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
     info_handle = logging.StreamHandler()
     info_handle.setLevel(logging.INFO)
-    error_handle = logging.FileHandler(
+    warning_handle = logging.FileHandler(
         Path(output_path) / "error.log", encoding="utf-8"
     )
-    error_handle.setLevel(logging.WARNING)
+    warning_handle.setLevel(logging.WARNING)
+    error_handle = logging.FileHandler(
+        Path(output_path) / "warning.log", encoding="utf-8"
+    )
+    error_handle.setLevel(logging.ERROR)
     logging.basicConfig(
-        handlers=[info_handle, error_handle], level=logging.INFO, format=LOG_FORMAT
+        handlers=[info_handle, warning_handle, error_handle], level=logging.INFO, format=LOG_FORMAT
     )
 
     for source_path in source_paths:
