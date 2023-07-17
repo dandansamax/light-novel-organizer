@@ -11,6 +11,7 @@ from typing import Optional
 
 from lxml import etree
 from unrar import rarfile
+from py7zr import SevenZipFile
 
 from bangumi_api import *
 
@@ -28,11 +29,8 @@ class Book:
         self.title = meta_info["title"]
         self.title = clean_name(self.title)
         self.author = meta_info["creator"]
-
-        order_pattern = "第?([一二三四五六七八九十]|\d){1,3}卷?话?"
-        title_pattern = f"^(\S+?)\s?({order_pattern}|\s({order_pattern}).*)$"
-        m = re.match(title_pattern, self.title)
-        self.series_name = m.group(1) if m is not None else None
+        self.series_name = None
+        self.series_name = self.get_series_name()
 
         self.bangumi_id = None
         self.bangumi_name = None
@@ -77,6 +75,22 @@ class Book:
             except Exception:
                 res[s] = "unkown"
         return res
+    
+    def get_series_name(self):
+        if self.series_name is not None:
+            return self.series_name
+        order_pattern = "第?([一二三四五六七八九十]|\d){1,3}卷?话?"
+        title_pattern = f"^(\S+?)\s?({order_pattern}|\s({order_pattern}).*)$"
+        m = re.match(title_pattern, self.title)
+        if m is not None:
+            return m.group(1)
+
+        title_pattern = f"^(\S+?)\s.*$"
+        m = re.match(title_pattern, self.title)
+        if m is not None:
+            return m.group(1)
+
+        return None
 
     def get_bangumi_info(self):
         keyword = self.series_name or self.title
@@ -131,17 +145,36 @@ def get_compressed(path: Path, tmp_path: Path, action: Optional[callable] = None
     logging.debug(f"handling {path}")
     extract_path = tmp_path / path.stem
     if path.suffix == ".zip":
-        comp_file = zipfile.ZipFile(path, "r")
+        with zipfile.ZipFile(path, "r") as comp_file:
+            for passwd in PASSWDS:
+                try:
+                    comp_file.extractall(str(extract_path), pwd=passwd)
+                    break
+                except RuntimeError:
+                    pass
+                except Exception:
+                    logging.exception(f"At location {path}.")
     elif path.suffix == ".rar":
-        comp_file = rarfile.RarFile(str(path), "r")
+        with rarfile.RarFile(str(path), "r") as comp_file:
+            for passwd in PASSWDS:
+                try:
+                    comp_file.extractall(str(extract_path), pwd=passwd)
+                    break
+                except RuntimeError:
+                    pass
+                except Exception:
+                    logging.exception(f"At location {path}.")
+    elif path.suffix == ".7z":
+        for passwd in PASSWDS:
+            try:
+                with SevenZipFile(path, "r", password=passwd) as comp_file:
+                    comp_file.extractall(str(extract_path))
+                    break
+            except Exception:
+                logging.exception(f"At location {path}.")
+
     else:
         raise RuntimeError(f"{path} has an unknown suffix")
-    for passwd in PASSWDS:
-        try:
-            comp_file.extractall(str(extract_path), pwd=passwd)
-            break
-        except Exception:
-            logging.exception(f"At location {path}.")
 
     logging.debug(f"extract dir: {extract_path}")
     if extract_path.is_dir() and any(extract_path.iterdir()):
@@ -160,7 +193,9 @@ def get_books(path, tmp_path, action: Optional[callable] = None) -> list[Book]:
                 action(epub)
             except Exception:
                 logging.exception(f"At location {path}.")
-    for comp_file in chain(path.rglob("*.zip"), path.rglob("*.rar")):
+    for comp_file in chain(
+        path.rglob("*.zip"), path.rglob("*.rar"), path.rglob("*.7z")
+    ):
         try:
             result.extend(get_compressed(comp_file, tmp_path, action))
         except Exception:
@@ -196,6 +231,31 @@ def transfer(source_path, output_path, tmp_path=None):
     get_books(source_path, tmp_path, action)
 
 
+def log_config(args):
+    LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+    info_handle = logging.StreamHandler()
+    if args.verbose:
+        info_handle.setLevel(logging.DEBUG)
+    else:
+        info_handle.setLevel(logging.INFO)
+
+    warning_handle = logging.FileHandler(
+        Path(output_path) / "warning.log", encoding="utf-8"
+    )
+    warning_handle.setLevel(logging.WARNING)
+
+    error_handle = logging.FileHandler(
+        Path(output_path) / "error.log", encoding="utf-8"
+    )
+    error_handle.setLevel(logging.ERROR)
+
+    logging.basicConfig(
+        handlers=[info_handle, warning_handle, error_handle],
+        level=logging.DEBUG,
+        format=LOG_FORMAT,
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Easily manage your light novel repo")
     parser.add_argument(
@@ -203,28 +263,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("-o", "--output", help="the output directory")
     parser.add_argument("-t", "--temp", help="the temp directory")
+    parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     args = parser.parse_args()
 
     source_paths = args.input if args.input is not None else ["."]
     output_path = args.output if args.output is not None else "output"
     Path(output_path).mkdir(exist_ok=True, parents=True)
 
-    LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-    info_handle = logging.StreamHandler()
-    info_handle.setLevel(logging.INFO)
-    warning_handle = logging.FileHandler(
-        Path(output_path) / "warning.log", encoding="utf-8"
-    )
-    warning_handle.setLevel(logging.WARNING)
-    error_handle = logging.FileHandler(
-        Path(output_path) / "error.log", encoding="utf-8"
-    )
-    error_handle.setLevel(logging.ERROR)
-    logging.basicConfig(
-        handlers=[info_handle, warning_handle, error_handle],
-        level=logging.INFO,
-        format=LOG_FORMAT,
-    )
+    log_config(args)
 
     for source_path in source_paths:
         transfer(source_path, output_path, args.temp)

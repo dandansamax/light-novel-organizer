@@ -1,3 +1,4 @@
 unrar
+py7zr
 lxml
 requests

@@ -2,6 +2,7 @@ import json
 from difflib import get_close_matches
 
 import requests
+import logging
 
 headers = {
     "user-agent": "dandansamax/light-novel-manager",
@@ -14,6 +15,7 @@ SEARCH_DICT = dict()
 
 def search_novel(keyword):
     if keyword in SEARCH_DICT:
+        logging.debug(f"Seach dict touch with data: {SEARCH_DICT[keyword]}")
         if SEARCH_DICT[keyword] is None:
             raise RuntimeError(f'Cannot find a novel by "{keyword}".')
         else:
@@ -61,8 +63,12 @@ def check_id(subject_id):
             "name": result["name_cn"] if "name_cn" in result else result["name"],
         }
 
+PERSON_DICT = {}
 
 def get_person_by_id(subject_id):
+    if subject_id in PERSON_DICT:
+        logging.debug(f"Person dict touch with data: {PERSON_DICT[subject_id]}")
+        return PERSON_DICT[subject_id]
     authors = []
     illustrators = []
     producers = []
@@ -76,4 +82,5 @@ def get_person_by_id(subject_id):
                 illustrators.append((role["id"], role["name"]))
             elif role["relation"] == "出版社":
                 producers.append((role["id"], role["name"]))
-    return {"authors": authors, "illustrators": illustrators, "producers": producers}
+    PERSON_DICT[subject_id] = {"authors": authors, "illustrators": illustrators, "producers": producers}
+    return PERSON_DICT[subject_id]
