@@ -26,6 +26,7 @@ class Book:
         self.path = path
         meta_info = self.get_meta_info()
         self.title = meta_info["title"]
+        self.title = clean_name(self.title)
         self.author = meta_info["creator"]
 
         order_pattern = "第?([一二三四五六七八九十]|\d){1,3}卷?话?"
@@ -119,6 +120,10 @@ class Book:
         )
 
 
+def clean_name(raw_name: str):
+    return raw_name.replace('"', "")
+
+
 PASSWDS = [None, b"tsdm", b"sbyr", b"light931"]
 
 
@@ -135,8 +140,8 @@ def get_compressed(path: Path, tmp_path: Path, action: Optional[callable] = None
         try:
             comp_file.extractall(str(extract_path), pwd=passwd)
             break
-        except Exception as e:
-            logging.error(f"{e} At location {path}.")
+        except Exception:
+            logging.exception(f"At location {path}.")
 
     logging.debug(f"extract dir: {extract_path}")
     if extract_path.is_dir() and any(extract_path.iterdir()):
@@ -153,13 +158,13 @@ def get_books(path, tmp_path, action: Optional[callable] = None) -> list[Book]:
         if action is not None:
             try:
                 action(epub)
-            except Exception as e:
-                logging.error(f"{e} At location {path}.")
+            except Exception:
+                logging.exception(f"At location {path}.")
     for comp_file in chain(path.rglob("*.zip"), path.rglob("*.rar")):
         try:
             result.extend(get_compressed(comp_file, tmp_path, action))
-        except Exception as e:
-            logging.error(f"{e} At location {path}.")
+        except Exception:
+            logging.exception(f"At location {path}.")
 
     return result
 
