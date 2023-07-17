@@ -201,13 +201,13 @@ if __name__ == "__main__":
 
     LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
     info_handle = logging.StreamHandler()
-    info_handle.setLevel(logging.DEBUG)
+    info_handle.setLevel(logging.INFO)
     error_handle = logging.FileHandler(
         Path(output_path) / "error.log", encoding="utf-8"
     )
     error_handle.setLevel(logging.WARNING)
     logging.basicConfig(
-        handlers=[info_handle, error_handle], level=logging.DEBUG, format=LOG_FORMAT
+        handlers=[info_handle, error_handle], level=logging.INFO, format=LOG_FORMAT
     )
 
     for source_path in source_paths:
